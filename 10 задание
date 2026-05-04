@@ -1,0 +1,297 @@
+/*Определить комбинированный(структурный) тип для представления информации по океаническим впадинам, 
+состоящей из названия впадины, ее глубины, океане местонахождения, типе впадины(разломная, хребет, желоб и др.).
+Ввести информацию по 20 впадинам.Вывести количество впадин глубже 7 тысяч метров.Затем вывести информацию по всем желобным впадинам,
+отсортированную по убыванию по океанам(рационально переставлять все поля структуры разом).
+Вывести сведения по типам 3 - х глубочайших впадин.Реализовать функцию изменения данных впадины по ее глубине, 
+а не по названию.В отдельный массив поместить все впадины одного океана(океан вводить с клавиатуры).
+Реализовать вывод отфильтрованных данных в виде оберточной функции.*/
+
+
+
+#include <iostream>
+#include <fstream>
+#include <cstring>
+using namespace std;
+
+enum TrenchType {
+    ZHELOB,
+    RAZLOM,
+    HREBET,
+    KOTLOVINA,
+    PROGIB
+};
+
+struct Location {
+    double lat;
+    double lon;
+};
+
+struct Trench {
+    char name[80];
+    double depth;
+    char ocean[40];
+    TrenchType type;
+    Location loc;
+};
+
+struct TrenchBin {
+    char name[80];
+    double depth;
+    char ocean[40];
+    TrenchType type;
+    double lat;
+    double lon;
+};
+
+string typeToStr(TrenchType t) {
+    if (t == ZHELOB)    return "Желоб";
+    if (t == RAZLOM)    return "Разлом";
+    if (t == HREBET)    return "Хребет";
+    if (t == KOTLOVINA) return "Котловина";
+    if (t == PROGIB)    return "Прогиб";
+    return "???";
+}
+
+void printOne(Trench t) {
+    cout << "Название: " << t.name << endl;
+    cout << "Глубина: " << t.depth << " м" << endl;
+    cout << "Океан: " << t.ocean << endl;
+    cout << "Тип: " << typeToStr(t.type) << endl;
+    cout << "Координаты: " << t.loc.lat << " " << t.loc.lon << endl;
+    cout << "-------------------" << endl;
+}
+
+void createDepthFile(const char* filename, Trench arr[], int n) {
+    ofstream fout(filename);
+    if (!fout.is_open()) {
+        cout << "Не удалось создать файл " << filename << endl;
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        char key[80];
+        strcpy_s(key, sizeof(key), arr[i].name);  
+        for (int j = 0; j < (int)strlen(key); j++) {
+            if (key[j] == ' ') key[j] = '_';
+        }
+        fout << key << " " << arr[i].depth << "\n";
+    }
+    fout.close();
+    cout << "[Задание 1] Файл " << filename << " создан." << endl;
+}
+
+void loadDepthsFromFile(const char* filename, Trench arr[], int n) {
+    ifstream fin(filename);
+    if (!fin.is_open()) {
+        cout << "Не удалось открыть файл " << filename << endl;
+        return;
+    }
+    char key[80];
+    double d;
+    int updated = 0;
+    while (fin >> key >> d) {
+        for (int j = 0; j < (int)strlen(key); j++) {
+            if (key[j] == '_') key[j] = ' ';
+        }
+        for (int i = 0; i < n; i++) {
+            if (strcmp(arr[i].name, key) == 0) {  
+                arr[i].depth = d;
+                updated++;
+                break;
+            }
+        }
+    }
+    fin.close();
+    cout << "[Задание 1] Обновлено записей из файла: " << updated << endl;
+}
+
+void writeBinFile(const char* filename, Trench arr[], int n) {
+    ofstream fout(filename, ios::binary | ios::out);
+    if (!fout.is_open()) {
+        cout << "Не удалось открыть файл для записи: " << filename << endl;
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        TrenchBin tb;
+        memset(tb.name, 0, 80);
+        memset(tb.ocean, 0, 40);
+
+        strcpy_s(tb.name, sizeof(tb.name), arr[i].name);  
+        tb.depth = arr[i].depth;
+        strcpy_s(tb.ocean, sizeof(tb.ocean), arr[i].ocean); 
+        tb.type = arr[i].type;
+        tb.lat = arr[i].loc.lat;
+        tb.lon = arr[i].loc.lon;
+
+        fout.write((char*)&tb, sizeof(TrenchBin));
+    }
+    fout.close();
+    cout << "[Задание 2] Записано в бинарный файл: " << filename << " (" << n << " записей)" << endl;
+}
+
+int readBinFile(const char* filename, Trench arr[], int maxN) {
+    ifstream fin(filename, ios::binary | ios::in);
+    if (!fin.is_open()) {
+        cout << "Не удалось открыть файл для чтения: " << filename << endl;
+        return 0;
+    }
+    int cnt = 0;
+    TrenchBin tb;
+    while (fin.read((char*)&tb, sizeof(TrenchBin)) && cnt < maxN) {
+        strcpy_s(arr[cnt].name, sizeof(arr[cnt].name), tb.name);  
+        arr[cnt].depth = tb.depth;
+        strcpy_s(arr[cnt].ocean, sizeof(arr[cnt].ocean), tb.ocean);  
+        arr[cnt].type = tb.type;
+        arr[cnt].loc.lat = tb.lat;
+        arr[cnt].loc.lon = tb.lon;
+        cnt++;
+    }
+    fin.close();
+    cout << "[Задание 2] Прочитано из бинарного файла: " << cnt << " записей" << endl;
+    return cnt;
+}
+
+int countDeep(Trench arr[], int n) {
+    int cnt = 0;
+    for (int i = 0; i < n; i++) {
+        if (arr[i].depth > 7000) cnt++;
+    }
+    return cnt;
+}
+
+void bubbleSort(Trench arr[], int n) {
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (strcmp(arr[j].ocean, arr[j + 1].ocean) < 0) {
+                Trench tmp = arr[j];
+                arr[j] = arr[j + 1];
+                arr[j + 1] = tmp;
+            }
+        }
+    }
+}
+
+void printZheloby(Trench arr[], int n) {
+    Trench tmp[20];
+    int cnt = 0;
+    for (int i = 0; i < n; i++) {
+        if (arr[i].type == ZHELOB) {
+            tmp[cnt] = arr[i];
+            cnt++;
+        }
+    }
+    bubbleSort(tmp, cnt);
+    cout << "\n== желобные впадины ==" << endl;
+    for (int i = 0; i < cnt; i++) printOne(tmp[i]);
+}
+
+void top3(Trench arr[], int n) {
+    Trench tmp[20];
+    for (int i = 0; i < n; i++) tmp[i] = arr[i];
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (tmp[j].depth < tmp[j + 1].depth) {
+                Trench t = tmp[j];
+                tmp[j] = tmp[j + 1];
+                tmp[j + 1] = t;
+            }
+        }
+    }
+    cout << "\n== типы 3-х глубочайших впадин ==" << endl;
+    for (int i = 0; i < 3 && i < n; i++) {
+        cout << i + 1 << ". " << tmp[i].name
+            << " - " << tmp[i].depth << " м - "
+            << typeToStr(tmp[i].type) << endl;
+    }
+}
+
+void changeByDepth(Trench arr[], int n,
+    double depth, const char* newName, double newDepth,
+    const char* newOcean, TrenchType newType, double lat, double lon)
+{
+    for (int i = 0; i < n; i++) {
+        if (arr[i].depth == depth) {
+            strcpy_s(arr[i].name, sizeof(arr[i].name), newName);  
+            arr[i].depth = newDepth;
+            strcpy_s(arr[i].ocean, sizeof(arr[i].ocean), newOcean);  
+            arr[i].type = newType;
+            arr[i].loc.lat = lat;
+            arr[i].loc.lon = lon;
+            cout << "запись обновлена!" << endl;
+            return;
+        }
+    }
+    cout << "не найдено" << endl;
+}
+
+void printFiltered(Trench arr[], int n, const char* ocean) {
+    cout << "\n== впадины океана: " << ocean << " ==" << endl;
+    int cnt = 0;
+    for (int i = 0; i < n; i++) {
+        if (strcmp(arr[i].ocean, ocean) == 0) {
+            printOne(arr[i]);
+            cnt++;
+        }
+    }
+    if (cnt == 0) cout << "ничего не найдено" << endl;
+}
+
+int main() {
+    setlocale(LC_ALL, "");
+
+    const int N = 20;
+    Trench trenches[N] = {
+        {"Марианский желоб",     11034, "Тихий",              ZHELOB,   {11.35,  142.20}},
+        {"Тонга",                10882, "Тихий",              ZHELOB,   {-23.3,  -174.5}},
+        {"Филиппинский желоб",   10540, "Тихий",              ZHELOB,   {9.81,   126.60}},
+        {"Желоб Кермадек",       10047, "Тихий",              ZHELOB,   {-31.8,  -177.4}},
+        {"Желоб Идзу-Бонин",      9810, "Тихий",              ZHELOB,   {30.0,   142.5 }},
+        {"Желоб Пуэрто-Рико",     8648, "Атлантический",      ZHELOB,   {19.7,   -66.2 }},
+        {"Желоб Саут-Сэндвич",    8264, "Атлантический",      ZHELOB,   {-55.0,  -26.0 }},
+        {"Зондский желоб",        7725, "Индийский",          ZHELOB,   {-10.0,  108.0 }},
+        {"Желоб Романш",          7728, "Атлантический",      RAZLOM,   {-0.2,   -18.5 }},
+        {"Желоб Перу-Чили",       8055, "Тихий",              ZHELOB,   {-23.0,  -71.5 }},
+        {"Срединно-Атл. хребет",  2600, "Атлантический",      HREBET,   {0.0,    -25.0 }},
+        {"Индийский хребет",      3000, "Индийский",          HREBET,   {-45.0,   70.0 }},
+        {"Котловина Агульяс",     5400, "Индийский",          KOTLOVINA,{-38.0,   26.0 }},
+        {"Котловина Кюсю",        4700, "Тихий",              KOTLOVINA,{30.0,   131.0 }},
+        {"Хребет Геккеля",        2550, "Северный Ледовитый", HREBET,   {87.0,    57.0 }},
+        {"Разлом Чарли-Гиббс",    3500, "Атлантический",      RAZLOM,   {52.5,   -32.0 }},
+        {"Разлом Меррей",         4200, "Тихий",              RAZLOM,   {33.5,  -130.0 }},
+        {"Прогиб Окинава",        2270, "Тихий",              PROGIB,   {26.0,   127.0 }},
+        {"Алеутский желоб",       7679, "Тихий",              ZHELOB,   {51.0,  -178.0 }},
+        {"Японский желоб",        8412, "Тихий",              ZHELOB,   {36.0,   143.0 }}
+    };
+
+    cout << "Впадин глубже 7000 м: " << countDeep(trenches, N) << endl;
+    printZheloby(trenches, N);
+    top3(trenches, N);
+    changeByDepth(trenches, N, 2270,
+        "Прогиб Окинава (обновл.)", 2275,
+        "Тихий", PROGIB, 26.2, 127.3);
+
+    cout << "\n========== ЗАДАНИЕ 1: текстовый файл ==========" << endl;
+    createDepthFile("depths.txt", trenches, N);
+
+    trenches[0].depth = 0;
+    trenches[1].depth = 0;
+    cout << "До загрузки: глубина [0] = " << trenches[0].depth
+        << ", глубина [1] = " << trenches[1].depth << endl;
+
+    loadDepthsFromFile("depths.txt", trenches, N);
+    cout << "После загрузки: глубина [0] = " << trenches[0].depth
+        << ", глубина [1] = " << trenches[1].depth << endl;
+
+    cout << "\n========== ЗАДАНИЕ 2: бинарный файл ==========" << endl;
+    writeBinFile("trenches.bin", trenches, N);
+
+    Trench loaded[20];
+    int cnt = readBinFile("trenches.bin", loaded, 20);
+
+    cout << "\nПервые 3 записи из бинарного файла:" << endl;
+    for (int i = 0; i < 3 && i < cnt; i++) {
+        printOne(loaded[i]);
+    }
+
+
+    return 0;
+}
